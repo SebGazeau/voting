@@ -214,7 +214,6 @@ contract Voting is Ownable{
 		}else{
 			revert("the chosen status is not good");
 		}
-		// votings[idEvent].workflowStatus = _status;
 		emit WorkflowStatusChange(previousStatus, _status);
 	}
 
