@@ -48,9 +48,6 @@ contract Voting is Ownable{
 	event WorkflowStatusChange(WorkflowStatus previousStatus, WorkflowStatus newStatus);
 	event ProposalRegistered(uint proposalId);
 	event Voted (address voter, uint proposalId);
-
-	event SendArrayProposals(Proposal[] proposals);
-	event SendArrayVoter(Voter[] voters);
 	/**
 	 * @dev Set contract deployer as owner
 	 */
@@ -122,8 +119,9 @@ contract Voting is Ownable{
 	}
 	/**
 	 * @dev Get all voters
+	 * @return voters array Voter
 	 */
-	function getAllVoter() public{
+	function getAllVoter() public view returns(Voter[] memory){
 		uint idEvent = votings.length -1;
 		address[] memory votersWhoVoted = votings[idEvent].votersWhoVoted;
 		uint nbrVoters = votersWhoVoted.length;
@@ -132,36 +130,45 @@ contract Voting is Ownable{
 		for(uint i = 0; i < nbrVoters; i++){
 			voters[i] = votings[idEvent].listVoter[votersWhoVoted[i]];
 		}
-		emit SendArrayVoter(voters);
+		return (voters);
 	}
 	/**
 	 * @dev Get winner proposal
 	 * @return Proposal return the winning proposal(s)
 	 */
-	function getWinner() public returns(Proposal[] memory){
+	function getWinner() public view returns(string memory){
 		uint idEvent = votings.length -1;
 		require(votings[idEvent].workflowStatus == WorkflowStatus.VotingSessionEnded, "Voting is not over yet");
 		uint nbrProposals = votings[idEvent].nbrOfProposals;
-		Proposal[] memory proposalsWin;
+		string memory proposalsWin;
 		uint win;
 		for(uint i = 0; i < nbrProposals; i++){
+			string memory description = votings[idEvent].proposals[i].description;
 			uint _voteCount = votings[idEvent].proposals[i].voteCount;
 			if (_voteCount > win) {
-				delete proposalsWin;
-				proposalsWin[0] = votings[idEvent].proposals[i];
+				proposalsWin = "";
+				
+				proposalsWin = string(
+					abi.encodePacked(
+						'Proposal Win ',uint2str(i),', with description : ',description, 'and a number of votes of',uint2str(_voteCount)
+						));
 				win = _voteCount;
 			}else if (_voteCount == win){
-				proposalsWin[proposalsWin.length] = votings[idEvent].proposals[i];
+				string memory exAequo = string(
+					abi.encodePacked(
+						' ex aequo with','Proposal Win ',uint2str(i),', with description : ',description, 'and a number of votes of',uint2str(_voteCount)
+						));
+				proposalsWin = string(abi.encodePacked(proposalsWin,exAequo));				
 			}
 		}
-		votings[idEvent].workflowStatus = WorkflowStatus.VotesTallied;
 		return proposalsWin;
 	}
 
 	/**
 	 * @dev Get proposals
+	 * @return proposal array proposals
 	 */
-	function getAllProposal() public {
+	function getAllProposal() public view returns(Proposal[] memory){
 		uint idEvent = votings.length -1;
 		uint nbrProposals = votings[idEvent].nbrOfProposals;
 		require(nbrProposals > 0, "There are no proposals yet");
@@ -169,7 +176,7 @@ contract Voting is Ownable{
 		for(uint i = 0; i < nbrProposals; i++){
 			proposals[i] = votings[idEvent].proposals[i];
 		}
-		emit SendArrayProposals(proposals);
+		return proposals;
 	}
 	/**
 	 * @dev Get all proposal
@@ -190,13 +197,13 @@ contract Voting is Ownable{
 		WorkflowStatus previousStatus = votings[idEvent].workflowStatus;
 
 		bool previousIsProposalStatus = previousStatus == WorkflowStatus.ProposalsRegistrationStarted || previousStatus == WorkflowStatus.ProposalsRegistrationEnded;
-		bool previousIsVotingStatus = previousStatus == WorkflowStatus.VotingSessionStarted || previousStatus == WorkflowStatus.VotingSessionEnded;
+		// bool previousIsVotingStatus = previousStatus == WorkflowStatus.VotingSessionStarted || previousStatus == WorkflowStatus.VotingSessionEnded;
 
 		bool forStartProposal = previousStatus == WorkflowStatus.RegisteringVoters && _status == WorkflowStatus.ProposalsRegistrationStarted;
 		bool forEndProposal = previousStatus == WorkflowStatus.ProposalsRegistrationStarted && _status == WorkflowStatus.ProposalsRegistrationEnded;
 		bool forStartVoting = previousIsProposalStatus && _status == WorkflowStatus.VotingSessionStarted;
 		bool forEndVoting = previousStatus == WorkflowStatus.VotingSessionStarted && _status == WorkflowStatus.VotingSessionEnded;
-		// bool forTallied = previousIsVotingStatus && _status == WorkflowStatus.VotesTallied;
+		bool forTallied = previousStatus == WorkflowStatus.VotingSessionEnded && _status == WorkflowStatus.VotesTallied;
 
 		if(forStartProposal){
 			votings[idEvent].workflowStatus = WorkflowStatus.ProposalsRegistrationStarted;
@@ -207,8 +214,8 @@ contract Voting is Ownable{
 			votings[idEvent].workflowStatus = WorkflowStatus.VotingSessionStarted;
 		}else if(forEndVoting){
 			votings[idEvent].workflowStatus = WorkflowStatus.VotingSessionEnded;
-		// }else if(forTallied){
-		// 	votings[idEvent].workflowStatus = WorkflowStatus.VotesTallied;
+		}else if(forTallied){
+			votings[idEvent].workflowStatus = WorkflowStatus.VotesTallied;
 		}else{
 			revert("the chosen status is not good");
 		}
@@ -260,5 +267,26 @@ contract Voting is Ownable{
 			votings[idEvent].nbrVoters--;
 		}
 		emit VotersExcluded(_address);
+	}
+
+
+	function uint2str(uint256 _i) internal pure returns (string memory str) {
+		if (_i == 0) {
+			return "0";
+		}
+		uint256 j = _i;
+		uint256 length;
+		while (j != 0) {
+			length++;
+			j /= 10;
+		}
+		bytes memory bstr = new bytes(length);
+		uint256 k = length;
+		j = _i;
+		while (j != 0) {
+			bstr[--k] = bytes1(uint8(48 + j % 10));
+			j /= 10;
+		}
+		str = string(bstr);
 	}
 }
