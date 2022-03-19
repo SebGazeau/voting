@@ -48,6 +48,9 @@ contract Voting is Ownable{
 	event WorkflowStatusChange(WorkflowStatus previousStatus, WorkflowStatus newStatus);
 	event ProposalRegistered(uint proposalId);
 	event Voted (address voter, uint proposalId);
+
+	event SendArrayProposals(Proposal[] proposals);
+	event SendArrayVoter(Voter[] voters);
 	/**
 	 * @dev Set contract deployer as owner
 	 */
@@ -119,9 +122,8 @@ contract Voting is Ownable{
 	}
 	/**
 	 * @dev Get all voters
-	 * @return voters array Voter
 	 */
-	function getAllVoter() public view returns(Voter[] memory){
+	function getAllVoter() public{
 		uint idEvent = votings.length -1;
 		address[] memory votersWhoVoted = votings[idEvent].votersWhoVoted;
 		uint nbrVoters = votersWhoVoted.length;
@@ -130,7 +132,7 @@ contract Voting is Ownable{
 		for(uint i = 0; i < nbrVoters; i++){
 			voters[i] = votings[idEvent].listVoter[votersWhoVoted[i]];
 		}
-		return (voters);
+		emit SendArrayVoter(voters);
 	}
 	/**
 	 * @dev Get winner proposal
@@ -158,9 +160,8 @@ contract Voting is Ownable{
 
 	/**
 	 * @dev Get proposals
-	 * @return proposal array proposals
 	 */
-	function getAllProposal() public view returns(Proposal[] memory){
+	function getAllProposal() public {
 		uint idEvent = votings.length -1;
 		uint nbrProposals = votings[idEvent].nbrOfProposals;
 		require(nbrProposals > 0, "There are no proposals yet");
@@ -168,7 +169,7 @@ contract Voting is Ownable{
 		for(uint i = 0; i < nbrProposals; i++){
 			proposals[i] = votings[idEvent].proposals[i];
 		}
-		return proposals;
+		emit SendArrayProposals(proposals);
 	}
 	/**
 	 * @dev Get all proposal
