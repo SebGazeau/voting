@@ -10,8 +10,6 @@ import "@openzeppelin/contracts/access/Ownable.sol";
  * @dev Voting system management
  */
 contract Voting is Ownable{
-	// Status for whitelist
-	enum AddressStatus { Default, Blacklist, Whitelist }
 	// Different states of a vote
 	enum WorkflowStatus { 
 		RegisteringVoters,
@@ -34,7 +32,7 @@ contract Voting is Ownable{
 	struct EventVoting { 
 		WorkflowStatus workflowStatus;
 		uint nbrVoters;
-		uint nbrHasVoted;
+		address[] votersWhoVoted;
 		uint nbrOfProposals;
 		mapping(address=> Voter) listVoter;
 		mapping(uint => Proposal) proposals;
@@ -90,6 +88,7 @@ contract Voting is Ownable{
 		require(votings[idEvent].workflowStatus == WorkflowStatus.ProposalsRegistrationStarted, "The previous vote is not over");
 		votings[idEvent].proposals[idProposal].description = _description;
 		votings[idEvent].nbrOfProposals++;
+		emit ProposalRegistered(idProposal);
 		return "your proposal has been registered";
 	}
 	/**
@@ -103,11 +102,84 @@ contract Voting is Ownable{
 		votings[idEvent].listVoter[msg.sender].votedProposalId = _proposalId;
 		votings[idEvent].listVoter[msg.sender].hasVoted = true;
 		votings[idEvent].proposals[_proposalId].voteCount++;
-		votings[idEvent].nbrHasVoted++;
+		votings[idEvent].votersWhoVoted.push(msg.sender);
 		emit Voted(msg.sender, _proposalId);
 	}
 
+	/**
+	 * @dev Get one voter
+	 * @param _addressVoter address of a voter
+	 * @return voter one Voter
+	 */
+	function getVoter(address _addressVoter) public view returns(Voter memory){
+		uint idEvent = votings.length -1;
+		Voter memory voter = votings[idEvent].listVoter[_addressVoter];
+		require(voter.hasVoted == true, "he hasn't voted yet");
+		return (voter);
+	}
+	/**
+	 * @dev Get all voters
+	 * @return voters array Voter
+	 */
+	function getAllVoter() public view returns(Voter[] memory){
+		uint idEvent = votings.length -1;
+		address[] memory votersWhoVoted = votings[idEvent].votersWhoVoted;
+		uint nbrVoters = votersWhoVoted.length;
+		require(nbrVoters > 0, "No one has voted yet");
+		Voter[] memory voters;
+		for(uint i = 0; i < nbrVoters; i++){
+			voters[i] = votings[idEvent].listVoter[votersWhoVoted[i]];
+		}
+		return (voters);
+	}
+	/**
+	 * @dev Get winner proposal
+	 * @return Proposal return the winning proposal(s)
+	 */
+	function getWinner() public view returns(Proposal[] memory){
+		uint idEvent = votings.length -1;
+		require(votings[idEvent].workflowStatus == WorkflowStatus.VotingSessionEnded, "Voting is not over yet");
+		uint nbrProposals = votings[idEvent].nbrOfProposals;
+		Proposal[] memory proposalsWin;
+		uint win;
+		for(uint i = 0; i < nbrProposals; i++){
+			uint _voteCount = votings[idEvent].proposals[i].voteCount;
+			if (_voteCount > win) {
+				delete proposalsWin;
+				proposalsWin[0] = votings[idEvent].proposals[i];
+				win = _voteCount;
+			}else if (_voteCount == win){
+				proposalsWin[proposalsWin.length] = votings[idEvent].proposals[i];
+			}
+		}
 
+		return proposalsWin;
+	}
+
+	/**
+	 * @dev Get proposals
+	 * @return proposal array proposals
+	 */
+	function getAllProposal() public view returns(Proposal[] memory){
+		uint idEvent = votings.length -1;
+		uint nbrProposals = votings[idEvent].nbrOfProposals;
+		require(nbrProposals > 0, "There are no proposals yet");
+		Proposal[] memory proposals;
+		for(uint i = 0; i < nbrProposals; i++){
+			proposals[i] = votings[idEvent].proposals[i];
+		}
+		return proposals;
+	}
+	/**
+	 * @dev Get all proposal
+	 * @param _id identifier of the proposal
+	 * @return proposal informations
+	 */
+	function getProposal(uint _id) public view returns(Proposal memory){
+		uint idEvent = votings.length -1;
+		Proposal memory proposal = votings[idEvent].proposals[_id];
+		return proposal;
+	}
 	/**
 	 * @dev change event status
 	 * @param _status new WorkflowStatus
@@ -130,6 +202,7 @@ contract Voting is Ownable{
 		}else if(forEndProposal){
 			votings[idEvent].workflowStatus = WorkflowStatus.ProposalsRegistrationEnded;
 		}else if(forStartVoting){
+			require(votings[idEvent].nbrOfProposals > 0, "there are no registered proposals yet");
 			votings[idEvent].workflowStatus = WorkflowStatus.VotingSessionStarted;
 		}else if(forEndVoting){
 			votings[idEvent].workflowStatus = WorkflowStatus.VotingSessionEnded;
@@ -141,11 +214,6 @@ contract Voting is Ownable{
 		// votings[idEvent].workflowStatus = _status;
 		emit WorkflowStatusChange(previousStatus, _status);
 	}
-
-
-
-
-
 
 	/**
 	 * @dev add a voter
