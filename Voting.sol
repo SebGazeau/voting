@@ -5,8 +5,6 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  * @title Voting
- * @dev CRUD Whitelist
- * @dev CRUD Proposal for voting
  * @dev Voting system management
  */
 contract Voting is Ownable{
