@@ -33,9 +33,9 @@ contract Voting is Ownable{
 	}
 	struct EventVoting { 
 		WorkflowStatus workflowStatus;
+		mapping(address=> Voter) listVoter;
 		mapping(uint => Proposal) proposals;
 	}
-	mapping(address=> Voter) public listVoter;
 	EventVoting[] public votings;
 
 	// mapping(uint => Proposal) public proposals;
@@ -47,14 +47,42 @@ contract Voting is Ownable{
 	event WorkflowStatusChange(WorkflowStatus previousStatus, WorkflowStatus newStatus);
 	event ProposalRegistered(uint proposalId);
 	event Voted (address voter, uint proposalId);
-	
+	/**
+	 * @dev Set contract deployer as owner
+	 */
+	constructor() {
+		votings.push();
+	}
+
 	// modifier to check if caller is an authorized voter
 	modifier anAuthorizedVoter() {
-		require(listVoter[msg.sender].isRegistered, "Caller is not authorised");
+		uint idEvent = votings.length -1;
+		require(votings[idEvent].listVoter[msg.sender].isRegistered, "Caller is not authorised");
+		_;
+	}
+	// modifier to check if caller can add voters
+	modifier inRegisteringStatus() {
+		uint idEvent = votings.length -1;
+		require(votings[idEvent].workflowStatus == WorkflowStatus.RegisteringVoters, "You can no longer add voters for this event");
 		_;
 	}
 
-	function voted(uint _proposalId) public anAuthorizedVoter() {
+	/**
+	 * @dev start voting
+	 */
+	function startVoting() public onlyOwner returns(bool isStarted){
+		uint idEvent = votings.length -1;
+		require(votings[idEvent].workflowStatus != WorkflowStatus.VotesTallied, "Caller is");
+		votings.push();
+		return true;
+	}
+
+
+	/**
+	 * @dev 
+	 * @param _proposalId id of the proposal voted
+	 */
+	function voted(uint _proposalId) public anAuthorizedVoter {
 		uint idEvent = votings.length -1;
 		require(votings[idEvent].workflowStatus == WorkflowStatus.VotingSessionStarted, "vote non ouvert");
 		votings[idEvent].proposals[_proposalId].voteCount++;
@@ -68,8 +96,9 @@ contract Voting is Ownable{
 	 * @dev add a voter
 	 * @param _address address to add
 	 */
-	function voterRegistered(address _address) public onlyOwner{
-		listVoter[_address].isRegistered = true;
+	function voterRegistered(address _address) public onlyOwner inRegisteringStatus{
+		uint idEvent = votings.length -1;
+		votings[idEvent].listVoter[_address].isRegistered = true;
 		emit VoterRegistered(_address);
 	}
 
@@ -77,9 +106,10 @@ contract Voting is Ownable{
 	 * @dev add voters
 	 * @param _address table of addresses to add
 	 */
-	function votersRegistered(address[] memory _address) public onlyOwner{
+	function votersRegistered(address[] memory _address) public onlyOwner inRegisteringStatus{
+		uint idEvent = votings.length -1;
 		for (uint i = 0; i < _address.length; i++){
-			listVoter[_address[i]].isRegistered = true;
+			votings[idEvent].listVoter[_address[i]].isRegistered = true;
 		}
 		emit VotersRegistered(_address);
 	}
@@ -87,17 +117,19 @@ contract Voting is Ownable{
 	 * @dev exclude a voter
 	 * @param _address address to eclude
 	 */
-	function voterExcluded(address _address) public onlyOwner{
-		listVoter[_address].isRegistered = false;
+	function voterExcluded(address _address) public onlyOwner inRegisteringStatus{
+		uint idEvent = votings.length -1;
+		votings[idEvent].listVoter[_address].isRegistered = false;
 		emit VoterExcluded(_address);
 	}
 	/**
 	 * @dev exclude voters
 	 * @param _address table of addresses to exclude
 	 */
-	function votersExcluded(address[] memory _address) public onlyOwner{
+	function votersExcluded(address[] memory _address) public onlyOwner inRegisteringStatus{
+		uint idEvent = votings.length -1;
 		for (uint i = 0; i < _address.length; i++){
-			listVoter[_address[i]].isRegistered = false;
+			votings[idEvent].listVoter[_address[i]].isRegistered = false;
 		}
 		emit VotersExcluded(_address);
 	}
