@@ -31,44 +31,74 @@ contract Voting is Ownable{
 		string description;
 		uint voteCount;
 	}
-	mapping(address=> AddressStatus) listStatus;
+	struct EventVoting { 
+		WorkflowStatus workflowStatus;
+		mapping(uint => Proposal) proposals;
+	}
+	mapping(address=> Voter) public listVoter;
+	EventVoting[] public votings;
 
-	event Authorized(address[] _address);
-	event Banned(address[] _address);
-	event Excluded(address[] _address);
+	// mapping(uint => Proposal) public proposals;
 	event VoterRegistered(address voterAddress); 
+	event VotersRegistered(address[] votersAddress); 
+	event VoterExcluded(address voterAddress);
+	event VotersExcluded(address[] votersAddress);
+
 	event WorkflowStatusChange(WorkflowStatus previousStatus, WorkflowStatus newStatus);
 	event ProposalRegistered(uint proposalId);
 	event Voted (address voter, uint proposalId);
 	
+	// modifier to check if caller is an authorized voter
+	modifier anAuthorizedVoter() {
+		require(listVoter[msg.sender].isRegistered, "Caller is not authorised");
+		_;
+	}
+
+	function voted(uint _proposalId) public anAuthorizedVoter() {
+		uint idEvent = votings.length -1;
+		require(votings[idEvent].workflowStatus == WorkflowStatus.VotingSessionStarted, "vote non ouvert");
+		votings[idEvent].proposals[_proposalId].voteCount++;
+		emit Voted(msg.sender, _proposalId);
+	}
+
+
+
+
 	/**
-	 * @dev change the status to allow voting
-	 * @param _address address table to accept
+	 * @dev add a voter
+	 * @param _address address to add
 	 */
-	function authorizeVoter(address[] memory _address) public onlyOwner{
+	function voterRegistered(address _address) public onlyOwner{
+		listVoter[_address].isRegistered = true;
+		emit VoterRegistered(_address);
+	}
+
+	/**
+	 * @dev add voters
+	 * @param _address table of addresses to add
+	 */
+	function votersRegistered(address[] memory _address) public onlyOwner{
 		for (uint i = 0; i < _address.length; i++){
-			listStatus[_address[i]] = AddressStatus.Whitelist;
+			listVoter[_address[i]].isRegistered = true;
 		}
-		emit Authorized(_address);
+		emit VotersRegistered(_address);
 	}
 	/**
-	 * @dev change the status to ban a voter
-	 * @param _address address table to ban
+	 * @dev exclude a voter
+	 * @param _address address to eclude
 	 */
-	function bannedVoter(address[] memory _address) public onlyOwner{
-		for (uint i = 0; i < _address.length; i++){
-			listStatus[_address[i]] = AddressStatus.Blacklist;
-		}
-		emit Banned(_address);
+	function voterExcluded(address _address) public onlyOwner{
+		listVoter[_address].isRegistered = false;
+		emit VoterExcluded(_address);
 	}
 	/**
-	 * @dev change the status to exclude a voter
-	 * @param _address address table to eclude
+	 * @dev exclude voters
+	 * @param _address table of addresses to exclude
 	 */
-	function excludeVoter(address[] memory _address) public onlyOwner{
+	function votersExcluded(address[] memory _address) public onlyOwner{
 		for (uint i = 0; i < _address.length; i++){
-			listStatus[_address[i]] = AddressStatus.Default;
+			listVoter[_address[i]].isRegistered = false;
 		}
-		emit Excluded(_address);
+		emit VotersExcluded(_address);
 	}
 }
