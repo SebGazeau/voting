@@ -138,7 +138,7 @@ contract Voting is Ownable{
 	 * @dev Get winner proposal
 	 * @return Proposal return the winning proposal(s)
 	 */
-	function getWinner() public view returns(Proposal[] memory){
+	function getWinner() public returns(Proposal[] memory){
 		uint idEvent = votings.length -1;
 		require(votings[idEvent].workflowStatus == WorkflowStatus.VotingSessionEnded, "Voting is not over yet");
 		uint nbrProposals = votings[idEvent].nbrOfProposals;
@@ -154,7 +154,7 @@ contract Voting is Ownable{
 				proposalsWin[proposalsWin.length] = votings[idEvent].proposals[i];
 			}
 		}
-
+		votings[idEvent].workflowStatus = WorkflowStatus.VotesTallied;
 		return proposalsWin;
 	}
 
@@ -196,7 +196,7 @@ contract Voting is Ownable{
 		bool forEndProposal = previousStatus == WorkflowStatus.ProposalsRegistrationStarted && _status == WorkflowStatus.ProposalsRegistrationEnded;
 		bool forStartVoting = previousIsProposalStatus && _status == WorkflowStatus.VotingSessionStarted;
 		bool forEndVoting = previousStatus == WorkflowStatus.VotingSessionStarted && _status == WorkflowStatus.VotingSessionEnded;
-		bool forTallied = previousIsVotingStatus && _status == WorkflowStatus.VotesTallied;
+		// bool forTallied = previousIsVotingStatus && _status == WorkflowStatus.VotesTallied;
 
 		if(forStartProposal){
 			votings[idEvent].workflowStatus = WorkflowStatus.ProposalsRegistrationStarted;
@@ -207,8 +207,8 @@ contract Voting is Ownable{
 			votings[idEvent].workflowStatus = WorkflowStatus.VotingSessionStarted;
 		}else if(forEndVoting){
 			votings[idEvent].workflowStatus = WorkflowStatus.VotingSessionEnded;
-		}else if(forTallied){
-			votings[idEvent].workflowStatus = WorkflowStatus.VotesTallied;
+		// }else if(forTallied){
+		// 	votings[idEvent].workflowStatus = WorkflowStatus.VotesTallied;
 		}else{
 			revert("the chosen status is not good");
 		}
