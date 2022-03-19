@@ -121,16 +121,12 @@ contract Voting is Ownable{
 	 * @dev Get all voters
 	 * @return voters array Voter
 	 */
-	function getAllVoter() public view returns(Voter[] memory){
+	function getAllVoter() public view returns(address[] memory){
 		uint idEvent = votings.length -1;
 		address[] memory votersWhoVoted = votings[idEvent].votersWhoVoted;
 		uint nbrVoters = votersWhoVoted.length;
 		require(nbrVoters > 0, "No one has voted yet");
-		Voter[] memory voters;
-		for(uint i = 0; i < nbrVoters; i++){
-			voters[i] = votings[idEvent].listVoter[votersWhoVoted[i]];
-		}
-		return (voters);
+		return (votersWhoVoted);
 	}
 	/**
 	 * @dev Get winner proposal
@@ -138,7 +134,8 @@ contract Voting is Ownable{
 	 */
 	function getWinner() public view returns(string memory){
 		uint idEvent = votings.length -1;
-		require(votings[idEvent].workflowStatus == WorkflowStatus.VotingSessionEnded, "Voting is not over yet");
+		WorkflowStatus tempWorkflowStatus = votings[idEvent].workflowStatus;
+		require(tempWorkflowStatus == WorkflowStatus.VotingSessionEnded || tempWorkflowStatus == WorkflowStatus.VotesTallied, "Voting is not over yet");
 		uint nbrProposals = votings[idEvent].nbrOfProposals;
 		string memory proposalsWin;
 		uint win;
@@ -147,16 +144,15 @@ contract Voting is Ownable{
 			uint _voteCount = votings[idEvent].proposals[i].voteCount;
 			if (_voteCount > win) {
 				proposalsWin = "";
-				
 				proposalsWin = string(
 					abi.encodePacked(
-						'Proposal Win ',uint2str(i),', with description : ',description, 'and a number of votes of',uint2str(_voteCount)
+						'Proposal Win ',uint2str(i),', with description : ',description, 'and a number of votes of ',uint2str(_voteCount)
 						));
 				win = _voteCount;
 			}else if (_voteCount == win){
 				string memory exAequo = string(
 					abi.encodePacked(
-						' ex aequo with','Proposal Win ',uint2str(i),', with description : ',description, 'and a number of votes of',uint2str(_voteCount)
+						' ex aequo with','Proposal Win ',uint2str(i),', with description : ',description, 'and a number of votes of ',uint2str(_voteCount)
 						));
 				proposalsWin = string(abi.encodePacked(proposalsWin,exAequo));				
 			}
@@ -172,7 +168,7 @@ contract Voting is Ownable{
 		uint idEvent = votings.length -1;
 		uint nbrProposals = votings[idEvent].nbrOfProposals;
 		require(nbrProposals > 0, "There are no proposals yet");
-		Proposal[] memory proposals;
+		Proposal[] memory proposals = new Proposal[](nbrProposals);
 		for(uint i = 0; i < nbrProposals; i++){
 			proposals[i] = votings[idEvent].proposals[i];
 		}
@@ -197,7 +193,6 @@ contract Voting is Ownable{
 		WorkflowStatus previousStatus = votings[idEvent].workflowStatus;
 
 		bool previousIsProposalStatus = previousStatus == WorkflowStatus.ProposalsRegistrationStarted || previousStatus == WorkflowStatus.ProposalsRegistrationEnded;
-		// bool previousIsVotingStatus = previousStatus == WorkflowStatus.VotingSessionStarted || previousStatus == WorkflowStatus.VotingSessionEnded;
 
 		bool forStartProposal = previousStatus == WorkflowStatus.RegisteringVoters && _status == WorkflowStatus.ProposalsRegistrationStarted;
 		bool forEndProposal = previousStatus == WorkflowStatus.ProposalsRegistrationStarted && _status == WorkflowStatus.ProposalsRegistrationEnded;
