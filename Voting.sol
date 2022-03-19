@@ -33,6 +33,9 @@ contract Voting is Ownable{
 	}
 	struct EventVoting { 
 		WorkflowStatus workflowStatus;
+		uint nbrVoters;
+		uint nbrHasVoted;
+		uint nbrOfProposals;
 		mapping(address=> Voter) listVoter;
 		mapping(uint => Proposal) proposals;
 	}
@@ -63,31 +66,83 @@ contract Voting is Ownable{
 	// modifier to check if caller can add voters
 	modifier inRegisteringStatus() {
 		uint idEvent = votings.length -1;
-		require(votings[idEvent].workflowStatus == WorkflowStatus.RegisteringVoters, "You can no longer add voters for this event");
+		require(votings[idEvent].workflowStatus == WorkflowStatus.RegisteringVoters, "The registration phase is over");
 		_;
 	}
 
 	/**
 	 * @dev start voting
+	 * @return isStarted boolean to indicate the good start
 	 */
 	function startVoting() public onlyOwner returns(bool isStarted){
 		uint idEvent = votings.length -1;
-		require(votings[idEvent].workflowStatus != WorkflowStatus.VotesTallied, "Caller is");
+		require(votings[idEvent].workflowStatus == WorkflowStatus.VotesTallied, "The previous vote is not over");
 		votings.push();
 		return true;
 	}
-
-
 	/**
-	 * @dev 
+	 * @dev set new proposal
+	 * @return infoSave registration status
+	 */
+	function setProposal(string memory _description) public anAuthorizedVoter returns(string memory infoSave){
+		uint idEvent = votings.length -1;
+		uint idProposal = votings[idEvent].nbrOfProposals;
+		require(votings[idEvent].workflowStatus == WorkflowStatus.ProposalsRegistrationStarted, "The previous vote is not over");
+		votings[idEvent].proposals[idProposal].description = _description;
+		votings[idEvent].nbrOfProposals++;
+		return "your proposal has been registered";
+	}
+	/**
+	 * @dev set vote 
 	 * @param _proposalId id of the proposal voted
 	 */
 	function voted(uint _proposalId) public anAuthorizedVoter {
 		uint idEvent = votings.length -1;
-		require(votings[idEvent].workflowStatus == WorkflowStatus.VotingSessionStarted, "vote non ouvert");
+		require(votings[idEvent].workflowStatus == WorkflowStatus.VotingSessionStarted, "you can't vote at the moment");
+		require(votings[idEvent].listVoter[msg.sender].hasVoted == false, "You have already voted");
+		votings[idEvent].listVoter[msg.sender].votedProposalId = _proposalId;
+		votings[idEvent].listVoter[msg.sender].hasVoted = true;
 		votings[idEvent].proposals[_proposalId].voteCount++;
+		votings[idEvent].nbrHasVoted++;
 		emit Voted(msg.sender, _proposalId);
 	}
+
+
+	/**
+	 * @dev change event status
+	 * @param _status new WorkflowStatus
+	 */
+	function workflowStatusChange(WorkflowStatus _status) public onlyOwner {
+		uint idEvent = votings.length -1;
+		WorkflowStatus previousStatus = votings[idEvent].workflowStatus;
+
+		bool previousIsProposalStatus = previousStatus == WorkflowStatus.ProposalsRegistrationStarted || previousStatus == WorkflowStatus.ProposalsRegistrationEnded;
+		bool previousIsVotingStatus = previousStatus == WorkflowStatus.VotingSessionStarted || previousStatus == WorkflowStatus.VotingSessionEnded;
+
+		bool forStartProposal = previousStatus == WorkflowStatus.RegisteringVoters && _status == WorkflowStatus.ProposalsRegistrationStarted;
+		bool forEndProposal = previousStatus == WorkflowStatus.ProposalsRegistrationStarted && _status == WorkflowStatus.ProposalsRegistrationEnded;
+		bool forStartVoting = previousIsProposalStatus && _status == WorkflowStatus.VotingSessionStarted;
+		bool forEndVoting = previousStatus == WorkflowStatus.VotingSessionStarted && _status == WorkflowStatus.VotingSessionEnded;
+		bool forTallied = previousIsVotingStatus && _status == WorkflowStatus.VotesTallied;
+
+		if(forStartProposal){
+			votings[idEvent].workflowStatus = WorkflowStatus.ProposalsRegistrationStarted;
+		}else if(forEndProposal){
+			votings[idEvent].workflowStatus = WorkflowStatus.ProposalsRegistrationEnded;
+		}else if(forStartVoting){
+			votings[idEvent].workflowStatus = WorkflowStatus.VotingSessionStarted;
+		}else if(forEndVoting){
+			votings[idEvent].workflowStatus = WorkflowStatus.VotingSessionEnded;
+		}else if(forTallied){
+			votings[idEvent].workflowStatus = WorkflowStatus.VotesTallied;
+		}else{
+			revert("the chosen status is not good");
+		}
+		// votings[idEvent].workflowStatus = _status;
+		emit WorkflowStatusChange(previousStatus, _status);
+	}
+
+
 
 
 
@@ -99,6 +154,7 @@ contract Voting is Ownable{
 	function voterRegistered(address _address) public onlyOwner inRegisteringStatus{
 		uint idEvent = votings.length -1;
 		votings[idEvent].listVoter[_address].isRegistered = true;
+		votings[idEvent].nbrVoters++;
 		emit VoterRegistered(_address);
 	}
 
@@ -110,6 +166,7 @@ contract Voting is Ownable{
 		uint idEvent = votings.length -1;
 		for (uint i = 0; i < _address.length; i++){
 			votings[idEvent].listVoter[_address[i]].isRegistered = true;
+			votings[idEvent].nbrVoters++;
 		}
 		emit VotersRegistered(_address);
 	}
@@ -120,6 +177,7 @@ contract Voting is Ownable{
 	function voterExcluded(address _address) public onlyOwner inRegisteringStatus{
 		uint idEvent = votings.length -1;
 		votings[idEvent].listVoter[_address].isRegistered = false;
+		votings[idEvent].nbrVoters--;
 		emit VoterExcluded(_address);
 	}
 	/**
@@ -130,6 +188,7 @@ contract Voting is Ownable{
 		uint idEvent = votings.length -1;
 		for (uint i = 0; i < _address.length; i++){
 			votings[idEvent].listVoter[_address[i]].isRegistered = false;
+			votings[idEvent].nbrVoters--;
 		}
 		emit VotersExcluded(_address);
 	}
